@@ -1,83 +1,80 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Movie Recommender</title>
-</head>
-<body>
-    <h1>Movie Recommender</h1>
-    
-    <select id="movieSelect">
-        <option value="">Select a movie</option>
-        <!-- Options will be added by JavaScript -->
-    </select>
-    
-    <button onclick="getRecommendations()">Get Recommendations</button>
-    
-    <div id="results"></div>
+<script>
+    // Your movie data - make sure this contains ALL your movies
+    const movies = [
+        {"title": "Toy Story", "vector": [0, 0, 0, 0, 0, 0], "overview": "..."},
+        {"title": "Jumanji", "vector": [0, 1, 0, 0, 0, 1], "overview": "..."},
+        {"title": "Grumpier Old Men", "vector": [0, 0, 0, 1, 0, 0], "overview": "..."},
+        {"title": "Waiting to Exhale", "vector": [0, 0, 1, 0, 0, 0], "overview": "..."},
+        {"title": "Father of the Bride Part II", "vector": [0, 0, 0, 0, 0, 0], "overview": "..."},
+        {"title": "Heat", "vector": [1, 0, 0, 0, 0, 0], "overview": "..."},
+        // ... ADD ALL YOUR OTHER MOVIES HERE ...
+        {"title": "Guardian Angel", "vector": [0, 0, 1, 0, 0, 0], "overview": "..."}
+    ];
 
-    <script>
-        // Your movie data - REPLACE this with your updated movies.json content
-        const movies = [
-            {"title": "Toy Story", "vector": [1, 1, 0, 0, 0, 1], "overview": "..."},
-            {"title": "Jumanji", "vector": [1, 0, 1, 0, 0, 1], "overview": "..."},
-            {"title": "Heat", "vector": [1, 0, 0, 0, 1, 0], "overview": "..."},
-            // ... add all your other movies here
-        ];
-
-        // Cosine similarity function - PUT THIS IN YOUR SCRIPT
-        function cosineSimilarity(vecA, vecB) {
-            let dotProduct = 0;
-            let normA = 0;
-            let normB = 0;
-            
-            for (let i = 0; i < vecA.length; i++) {
-                dotProduct += vecA[i] * vecB[i];
-                normA += vecA[i] * vecA[i];
-                normB += vecB[i] * vecB[i];
-            }
-            
-            return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    // Cosine similarity function
+    function cosineSimilarity(vecA, vecB) {
+        let dotProduct = 0;
+        let normA = 0;
+        let normB = 0;
+        
+        for (let i = 0; i < vecA.length; i++) {
+            dotProduct += vecA[i] * vecB[i];
+            normA += vecA[i] * vecA[i];
+            normB += vecB[i] * vecB[i];
         }
+        
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
 
-        // Populate dropdown - PUT THIS IN YOUR SCRIPT
-        function populateDropdown() {
-            const select = document.getElementById('movieSelect');
-            movies.forEach(movie => {
-                const option = document.createElement('option');
-                option.value = movie.title;
-                option.textContent = movie.title;
-                select.appendChild(option);
-            });
+    // Populate dropdown with ALL movies
+    function populateDropdown() {
+        const select = document.getElementById('movieSelect');
+        
+        // Clear existing options first
+        select.innerHTML = '<option value="">Select a movie</option>';
+        
+        // Add ALL movies to dropdown
+        movies.forEach(movie => {
+            const option = document.createElement('option');
+            option.value = movie.title;
+            option.textContent = movie.title;
+            select.appendChild(option);
+        });
+    }
+
+    // Get recommendations
+    function getRecommendations() {
+        const selectedMovieTitle = document.getElementById('movieSelect').value;
+        const selectedMovie = movies.find(m => m.title === selectedMovieTitle);
+        
+        if (!selectedMovie) {
+            alert('Please select a movie first!');
+            return;
         }
-
-        // Get recommendations - PUT THIS IN YOUR SCRIPT
-        function getRecommendations() {
-            const selectedMovieTitle = document.getElementById('movieSelect').value;
-            const selectedMovie = movies.find(m => m.title === selectedMovieTitle);
-            
-            if (!selectedMovie) return;
-            
-            // Calculate similarities
-            const similarities = movies.map(movie => ({
-                title: movie.title,
-                similarity: cosineSimilarity(selectedMovie.vector, movie.vector)
-            }));
-            
-            // Sort by similarity (descending) and remove the same movie
-            similarities.sort((a, b) => b.similarity - a.similarity);
-            const recommendations = similarities.filter(m => m.title !== selectedMovie.title).slice(0, 5);
-            
-            // Display results
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = `<h3>Because you liked "${selectedMovie.title}", we recommend:</h3>`;
-            
+        
+        // Calculate similarities for ALL movies
+        const similarities = movies.map(movie => ({
+            title: movie.title,
+            similarity: cosineSimilarity(selectedMovie.vector, movie.vector)
+        }));
+        
+        // Sort by similarity (descending) and remove the same movie
+        similarities.sort((a, b) => b.similarity - a.similarity);
+        const recommendations = similarities.filter(m => m.title !== selectedMovie.title).slice(0, 5);
+        
+        // Display results
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `<h3>Because you liked "${selectedMovie.title}", we recommend:</h3>`;
+        
+        if (recommendations.length === 0) {
+            resultsDiv.innerHTML += `<p>No similar movies found.</p>`;
+        } else {
             recommendations.forEach(rec => {
                 resultsDiv.innerHTML += `<p>${rec.title} (similarity: ${rec.similarity.toFixed(2)})</p>`;
             });
         }
+    }
 
-        // Initialize dropdown when page loads
-        populateDropdown();
-    </script>
-</body>
-</html>
+    // Initialize dropdown when page loads
+    document.addEventListener('DOMContentLoaded', populateDropdown);
+</script>
