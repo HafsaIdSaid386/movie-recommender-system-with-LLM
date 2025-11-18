@@ -2,126 +2,174 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Movie Recommender System</title>
+  <title>Content-Based Movie Recommender</title>
   <style>
-    body { 
-      font-family: Arial, sans-serif; 
-      padding: 20px; 
-      background: #fafafa;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fb;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
     }
-    .container {
-      max-width: 600px; 
-      margin: auto;
+    .card {
+      background: #ffffff;
+      margin-top: 40px;
+      padding: 30px 35px 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      max-width: 700px;
+      width: 90%;
     }
-    h2 {
+    h1 {
       text-align: center;
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 28px;
     }
-    select, button {
-      padding: 12px;
-      font-size: 16px;
-      margin-top: 10px;
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 25px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 6px;
+    }
+    select {
       width: 100%;
+      padding: 10px 12px;
+      font-size: 15px;
       border-radius: 6px;
       border: 1px solid #ccc;
+      margin-bottom: 15px;
     }
     button {
-      background: #f0f0f0;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      background: #008cba;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
       cursor: pointer;
     }
     button:hover {
-      background: #e4e4e4;
+      background: #0077a0;
     }
     #results {
       margin-top: 25px;
     }
-    .movie {
-      background: white;
-      padding: 12px;
-      margin: 8px 0;
+    .result-box {
+      border-left: 4px solid #00a0d2;
+      padding: 12px 14px;
+      background: #f9fcff;
       border-radius: 6px;
-      border: 1px solid #ddd;
+      color: #333;
+      line-height: 1.5;
+    }
+    .movie-title {
+      font-weight: bold;
+    }
+    .rec-list {
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
-<div class="container">
-  <h2>Movie Recommender</h2>
+  <div class="card">
+    <h1>Content-Based Movie Recommender</h1>
+    <p class="subtitle">
+      Select a movie you like and we will find genre-similar ones using
+      <b>cosine similarity</b>.
+    </p>
 
-  <label><b>Select a movie:</b></label>
-  <select id="movieSelect"></select>
+    <label for="movieSelect">Select a movie:</label>
+    <select id="movieSelect"></select>
 
-  <button onclick="recommend()">Recommend</button>
+    <button onclick="recommend()">Get Recommendations</button>
 
-  <div id="results"></div>
-</div>
+    <div id="results"></div>
+  </div>
 
-<script>
-// ---- LOAD MOVIES.JSON ----
-let movies = [];
-fetch("movies.json")
-  .then(res => res.json())
-  .then(data => {
-    movies = data;
+  <script>
+    // ---- LOAD MOVIES.JSON ----
+    let movies = [];
+    fetch("movies.json")
+      .then(res => res.json())
+      .then(data => {
+        movies = data;
 
-    const dropdown = document.getElementById("movieSelect");
-    movies.forEach((m, i) => {
-      const option = document.createElement("option");
-      option.value = i;
-      option.textContent = m.title;
-      dropdown.appendChild(option);
-    });
-  });
+        const dropdown = document.getElementById("movieSelect");
+        movies.forEach((m, i) => {
+          const option = document.createElement("option");
+          option.value = i;
+          option.textContent = m.title;
+          dropdown.appendChild(option);
+        });
+      });
 
-// ---- COSINE SIMILARITY (robust, no NaN) ----
-function cosine(a, b) {
-  if (!a || !b || a.length !== b.length) return 0;
+    // ---- COSINE SIMILARITY (robust, no NaN) ----
+    function cosine(a, b) {
+      if (!a || !b || a.length !== b.length) return 0;
 
-  let dot = 0, magA = 0, magB = 0;
+      let dot = 0, magA = 0, magB = 0;
+      for (let i = 0; i < a.length; i++) {
+        const x = Number(a[i]) || 0;
+        const y = Number(b[i]) || 0;
+        dot += x * y;
+        magA += x * x;
+        magB += y * y;
+      }
 
-  for (let i = 0; i < a.length; i++) {
-    const x = Number(a[i]) || 0;
-    const y = Number(b[i]) || 0;
-    dot += x * y;
-    magA += x * x;
-    magB += y * y;
-  }
+      if (magA === 0 || magB === 0) return 0;
 
-  if (magA === 0 || magB === 0) return 0;
+      const sim = dot / (Math.sqrt(magA) * Math.sqrt(magB));
+      if (!isFinite(sim) || isNaN(sim)) return 0;
+      return sim;
+    }
 
-  const sim = dot / (Math.sqrt(magA) * Math.sqrt(magB));
-  if (!isFinite(sim) || isNaN(sim)) return 0;
-  return sim;
-}
+    // ---- RECOMMENDATION FUNCTION ----
+    function recommend() {
+      const select = document.getElementById("movieSelect");
+      const idx = Number(select.value);
+      const baseMovie = movies[idx];
+      const baseVec = baseMovie.vector;
 
-// ---- RECOMMENDATION FUNCTION ----
-function recommend() {
-  const idx = Number(document.getElementById("movieSelect").value);
-  const vec = movies[idx].vector;
+      const sims = movies.map((m, i) => ({
+        index: i,
+        sim: cosine(baseVec, m.vector)
+      }));
 
-  const sims = movies.map((m, i) => ({
-    index: i,
-    sim: cosine(vec, m.vector)
-  }));
+      // Sort by similarity, highest first
+      sims.sort((a, b) => b.sim - a.sim);
 
-  sims.sort((a, b) => b.sim - a.sim);
+      // Take top 2 recommendations (skip itself)
+      const top = sims.filter(s => s.index !== idx).slice(0, 2);
+      const recTitles = top.map(t => movies[t.index].title);
 
-  const top = sims.slice(1, 6); // skip itself
+      const resultsDiv = document.getElementById("results");
 
-  let output = `<h3>Recommended Movies:</h3>`;
-  top.forEach(t => {
-    const score = (!isFinite(t.sim) || isNaN(t.sim)) ? "0.000" : t.sim.toFixed(3);
-    output += `
-      <div class="movie">
-        <b>${movies[t.index].title}</b><br>
-        Similarity score: ${score}
-      </div>
-    `;
-  });
+      if (recTitles.length === 0) {
+        resultsDiv.innerHTML = "";
+        return;
+      }
 
-  document.getElementById("results").innerHTML = output;
-}
-</script>
+      const recText = recTitles.join(", ");
 
+      resultsDiv.innerHTML = `
+        <div class="result-box">
+          Because you liked <span class="movie-title">"${baseMovie.title}"</span>,
+          we recommend (cosine similarity):
+          <span class="rec-list">${recText}</span>.
+        </div>
+      `;
+    }
+  </script>
 </body>
 </html>
