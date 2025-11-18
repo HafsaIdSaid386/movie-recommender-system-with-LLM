@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Content-Based Movie Recommender</title>
+  <title>Content-Based Movie Feature Recommender</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -14,25 +14,28 @@
       align-items: flex-start;
       min-height: 100vh;
     }
+    .page {
+      max-width: 800px;
+      width: 95%;
+      margin-top: 40px;
+    }
     .card {
       background: #ffffff;
-      margin-top: 40px;
-      padding: 30px 35px 40px;
+      padding: 26px 30px 32px;
       border-radius: 10px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      max-width: 700px;
-      width: 90%;
+      margin-bottom: 20px;
     }
     h1 {
       text-align: center;
       margin-top: 0;
-      margin-bottom: 10px;
-      font-size: 28px;
+      margin-bottom: 6px;
+      font-size: 30px;
     }
     .subtitle {
       text-align: center;
       color: #666;
-      margin-bottom: 25px;
+      margin-bottom: 22px;
     }
     label {
       font-weight: bold;
@@ -45,11 +48,11 @@
       font-size: 15px;
       border-radius: 6px;
       border: 1px solid #ccc;
-      margin-bottom: 15px;
+      margin-bottom: 12px;
     }
-    button {
+    button.primary {
       width: 100%;
-      padding: 12px;
+      padding: 11px;
       border: none;
       border-radius: 6px;
       background: #008cba;
@@ -58,47 +61,101 @@
       font-weight: 600;
       cursor: pointer;
     }
-    button:hover {
-      background: #0077a0;
+    button.primary:hover {
+      background: #0075a0;
     }
-    #results {
-      margin-top: 25px;
-    }
-    .result-box {
-      border-left: 4px solid #00a0d2;
-      padding: 12px 14px;
-      background: #f9fcff;
-      border-radius: 6px;
-      color: #333;
-      line-height: 1.5;
-    }
-    .movie-title {
+
+    /* Consolidate & Finalize section */
+    .section-title {
+      font-size: 18px;
       font-weight: bold;
+      margin-bottom: 8px;
     }
-    .rec-list {
+    .pill-buttons {
+      margin-bottom: 10px;
+    }
+    .pill-buttons button {
+      border: none;
+      padding: 8px 16px;
+      border-radius: 999px;
+      margin-right: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      background: #d5c3ff;
+      color: #4a148c;
+    }
+    .pill-buttons button.active {
+      background: #8e24aa;
+      color: #fff;
+    }
+    .stage-description {
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+    .movie-block-title {
       font-weight: bold;
+      margin-top: 8px;
+      margin-bottom: 4px;
+    }
+    .feature-line {
+      margin: 2px 0;
+    }
+    .counts {
+      font-size: 13px;
+      color: #777;
+      margin-top: 6px;
+      margin-bottom: 4px;
+    }
+    .overview {
+      font-size: 13px;
+      color: #555;
+      margin-top: 4px;
     }
   </style>
 </head>
 
 <body>
-  <div class="card">
-    <h1>Content-Based Movie Recommender</h1>
-    <p class="subtitle">
-      Select a movie you like and we will find genre-similar ones using
-      <b>cosine similarity</b>.
-    </p>
+  <div class="page">
+    <!-- TOP CARD: SELECT + ANALYZE -->
+    <div class="card">
+      <h1>Content-Based Movie Recommender</h1>
+      <p class="subtitle">
+        Select a movie to analyze its sub-genre and themes using feature engineering and
+        <b>cosine similarity</b>.
+      </p>
 
-    <label for="movieSelect">Select a movie:</label>
-    <select id="movieSelect"></select>
+      <label for="movieSelect">Select a movie to analyze:</label>
+      <select id="movieSelect"></select>
 
-    <button onclick="recommend()">Get Recommendations</button>
+      <button class="primary" onclick="analyzeMovie()">Analyze Movie</button>
+    </div>
 
-    <div id="results"></div>
+    <!-- SECOND CARD: CONSOLIDATE & FINALIZE -->
+    <div class="card" id="analysisCard" style="display:none;">
+      <div class="section-title">Consolidate &amp; Finalize</div>
+
+      <div class="pill-buttons">
+        <button id="btnConsolidate" class="active" onclick="setStage('consolidate')">
+          Consolidate Keywords
+        </button>
+        <button id="btnFinalize" onclick="setStage('finalize')">
+          Finalize &amp; Encode
+        </button>
+      </div>
+
+      <div id="stageText" class="stage-description">
+        Cluster similar terms into master lists (e.g., “Sci-Fi” → “Science Fiction”).
+        Classify selected movie using master lists for consistency.
+      </div>
+
+      <div id="movieAnalysis"></div>
+    </div>
   </div>
 
   <script>
-    // ---- LOAD MOVIES.JSON ----
+    // ---------- Load movies.json ----------
     let movies = [];
     fetch("movies.json")
       .then(res => res.json())
@@ -114,61 +171,95 @@
         });
       });
 
-    // ---- COSINE SIMILARITY (robust, no NaN) ----
-    function cosine(a, b) {
-      if (!a || !b || a.length !== b.length) return 0;
+    // ---------- Very simple "LLM-like" feature extractor ----------
+    function extractFeatures(overview) {
+      const text = (overview || "").toLowerCase();
+      const sub = [];
+      const themes = [];
 
-      let dot = 0, magA = 0, magB = 0;
-      for (let i = 0; i < a.length; i++) {
-        const x = Number(a[i]) || 0;
-        const y = Number(b[i]) || 0;
-        dot += x * y;
-        magA += x * x;
-        magB += y * y;
-      }
+      // Sub-genres (dummy rules – stand-in for LLM)
+      if (text.includes("space") || text.includes("planet") || text.includes("galaxy"))
+        sub.push("Science Fiction");
+      if (text.includes("love") || text.includes("romance") || text.includes("romantic"))
+        sub.push("Romance");
+      if (text.includes("war") || text.includes("battle") || text.includes("fight"))
+        sub.push("Action");
+      if (text.includes("magic") || text.includes("wizard") || text.includes("fantasy"))
+        sub.push("Fantasy");
+      if (text.includes("school") || text.includes("students") || text.includes("teen"))
+        sub.push("Comedy");
 
-      if (magA === 0 || magB === 0) return 0;
+      // Themes
+      if (text.includes("hero") || text.includes("save"))
+        themes.push("Hero's Journey");
+      if (text.includes("family") || text.includes("father") || text.includes("mother"))
+        themes.push("Family");
+      if (text.includes("friend") || text.includes("friends") || text.includes("team"))
+        themes.push("Friendship");
+      if (text.includes("evil") || text.includes("dark"))
+        themes.push("Good vs Evil");
+      if (text.includes("future") || text.includes("virus") || text.includes("apocalypse"))
+        themes.push("Survival / Future World");
+      if (text.includes("grow up") || text.includes("coming of age") || text.includes("childhood"))
+        themes.push("Coming of Age");
 
-      const sim = dot / (Math.sqrt(magA) * Math.sqrt(magB));
-      if (!isFinite(sim) || isNaN(sim)) return 0;
-      return sim;
+      return {
+        subGenres: Array.from(new Set(sub)),
+        themes: Array.from(new Set(themes))
+      };
     }
 
-    // ---- RECOMMENDATION FUNCTION ----
-    function recommend() {
+    // ---------- Analyze Movie Button ----------
+    function analyzeMovie() {
       const select = document.getElementById("movieSelect");
       const idx = Number(select.value);
-      const baseMovie = movies[idx];
-      const baseVec = baseMovie.vector;
+      const movie = movies[idx];
 
-      const sims = movies.map((m, i) => ({
-        index: i,
-        sim: cosine(baseVec, m.vector)
-      }));
+      const { subGenres, themes } = extractFeatures(movie.overview);
+      const subText = subGenres.length ? subGenres.join(", ") : "Not detected";
+      const themeText = themes.length ? themes.join(", ") : "Not detected";
 
-      // Sort by similarity, highest first
-      sims.sort((a, b) => b.sim - a.sim);
+      const countsText =
+        `Collected: ${subGenres.length} sub-genre(s), ${themes.length} theme(s).`;
 
-      // Take top 2 recommendations (skip itself)
-      const top = sims.filter(s => s.index !== idx).slice(0, 2);
-      const recTitles = top.map(t => movies[t.index].title);
+      const overviewShort = (movie.overview || "").length > 220
+        ? movie.overview.slice(0, 220) + "..."
+        : movie.overview || "No overview available.";
 
-      const resultsDiv = document.getElementById("results");
-
-      if (recTitles.length === 0) {
-        resultsDiv.innerHTML = "";
-        return;
-      }
-
-      const recText = recTitles.join(", ");
-
-      resultsDiv.innerHTML = `
-        <div class="result-box">
-          Because you liked <span class="movie-title">"${baseMovie.title}"</span>,
-          we recommend (cosine similarity):
-          <span class="rec-list">${recText}</span>.
+      const block = `
+        <div class="movie-block-title">Movie: ${movie.title}</div>
+        <div class="feature-line"><b>Sub-genre:</b> ${subText}</div>
+        <div class="feature-line"><b>Themes:</b> ${themeText}</div>
+        <div class="counts">${countsText}</div>
+        <div class="overview">
+          <b>Based on overview:</b> ${overviewShort}
         </div>
       `;
+
+      document.getElementById("movieAnalysis").innerHTML = block;
+      document.getElementById("analysisCard").style.display = "block";
+
+      // reset to Consolidate stage by default
+      setStage("consolidate");
+    }
+
+    // ---------- Toggle stage text / button state ----------
+    function setStage(stage) {
+      const consolidateBtn = document.getElementById("btnConsolidate");
+      const finalizeBtn = document.getElementById("btnFinalize");
+      const stageText = document.getElementById("stageText");
+
+      if (stage === "consolidate") {
+        consolidateBtn.classList.add("active");
+        finalizeBtn.classList.remove("active");
+        stageText.textContent =
+          'Cluster similar terms into master lists (e.g., “Sci-Fi” → “Science Fiction”). This step reduces noise and makes features consistent across movies.';
+      } else {
+        finalizeBtn.classList.add("active");
+        consolidateBtn.classList.remove("active");
+        stageText.textContent =
+          'Finalize & encode the movie using the master lists. The selected sub-genres and themes are converted into a numeric feature vector for cosine-similarity recommendations.';
+      }
     }
   </script>
 </body>
