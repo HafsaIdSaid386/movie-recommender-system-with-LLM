@@ -57,61 +57,64 @@
 </div>
 
 <script>
-// Load the movie data (movies.json must be in same folder)
+// ---- LOAD MOVIES.JSON ----
 let movies = [];
 fetch("movies.json")
   .then(res => res.json())
   .then(data => {
     movies = data;
 
-    let dropdown = document.getElementById("movieSelect");
+    const dropdown = document.getElementById("movieSelect");
     movies.forEach((m, i) => {
-      let option = document.createElement("option");
+      const option = document.createElement("option");
       option.value = i;
       option.textContent = m.title;
       dropdown.appendChild(option);
     });
   });
 
-// ---- COSINE SIMILARITY (FIXED: no NaN) ----
+// ---- COSINE SIMILARITY (robust, no NaN) ----
 function cosine(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+
   let dot = 0, magA = 0, magB = 0;
 
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
+    const x = Number(a[i]) || 0;
+    const y = Number(b[i]) || 0;
+    dot += x * y;
+    magA += x * x;
+    magB += y * y;
   }
 
-  magA = Math.sqrt(magA);
-  magB = Math.sqrt(magB);
-
-  // Prevent division by zero → avoid NaN
   if (magA === 0 || magB === 0) return 0;
 
-  return dot / (magA * magB);
+  const sim = dot / (Math.sqrt(magA) * Math.sqrt(magB));
+  if (!isFinite(sim) || isNaN(sim)) return 0;
+  return sim;
 }
 
 // ---- RECOMMENDATION FUNCTION ----
 function recommend() {
-  let idx = document.getElementById("movieSelect").value;
-  let vec = movies[idx].vector;
+  const idx = Number(document.getElementById("movieSelect").value);
+  const vec = movies[idx].vector;
 
-  let sims = movies.map((m, i) => ({
+  const sims = movies.map((m, i) => ({
     index: i,
     sim: cosine(vec, m.vector)
   }));
 
   sims.sort((a, b) => b.sim - a.sim);
 
-  let top = sims.slice(1, 6); // skip itself
+  const top = sims.slice(1, 6); // skip itself
 
   let output = `<h3>Recommended Movies:</h3>`;
   top.forEach(t => {
+    const score = (!isFinite(t.sim) || isNaN(t.sim)) ? "0.000" : t.sim.toFixed(3);
     output += `
       <div class="movie">
         <b>${movies[t.index].title}</b><br>
-        Similarity score: ${t.sim.toFixed(3)}
+        Similarity score: ${score}
       </div>
     `;
   });
